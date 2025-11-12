@@ -1,6 +1,6 @@
 use crate::server::{HttpRequest,HttpResponse,StatusCode};
-use std::collections::HashMap;
-
+use std::{collections::HashMap, io::Write, net::{TcpListener,TcpStream}};
+use std::io::Read;
 /// Type alias for a function that handles HTTP requests and returns responses.
 /// 
 /// Handlers take an `HttpRequest` and return an `HttpResponse`.
@@ -15,7 +15,7 @@ pub type Handler = Box<dyn Fn(HttpRequest) -> HttpResponse>;
 /// # Examples
 /// 
 /// ```
-/// use your_crate::{App, HttpRequest, HttpResponse, StatusCode};
+/// use mhttp::{App, HttpRequest, HttpResponse, StatusCode};
 /// 
 /// let mut app = App::new();
 /// 
@@ -70,7 +70,7 @@ impl App {
     /// # Examples
     /// 
     /// ```
-    /// use your_crate::{App, HttpRequest, HttpResponse};
+    /// use mhttp::{App, HttpRequest, HttpResponse};
     /// 
     /// let mut app = App::new();
     /// 
@@ -97,7 +97,7 @@ impl App {
     /// # Examples
     /// 
     /// ```
-    /// use your_crate::{App, HttpRequest, HttpResponse, StatusCode};
+    /// use mhttp::{App, HttpRequest, HttpResponse, StatusCode};
     /// 
     /// let mut app = App::new();
     /// 
@@ -122,4 +122,115 @@ impl App {
             None => HttpResponse::new(StatusCode::NotFound, "Not Found".to_string()),
         }
     }
+
+    /// Starts a server on a specified port
+    /// 
+    /// 
+    /// 
+    /// 
+    /// # Arguments
+    /// 
+    /// 
+    /// * `port` - a designated port number
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use mhttp::App;
+    /// use mhttp::Respondable;
+    /// 
+    /// fn main() {
+    ///     
+    ///     let mut app = App::new();
+    ///     
+    ///     app.add_handler("/".to_string(), |_| => {
+    ///         "hello world".into_response()
+    ///     });
+    /// 
+    ///     app.listen(3000);
+    /// }
+    /// ```
+    /// 
+    pub fn listen(&self,port: u16) {
+        if let Ok(listener) = TcpListener::bind(format!("localhost:{port}")) {
+            println!("Listening on a port {port}...");
+            loop {
+                let (mut socket,_) = listener.accept().unwrap();
+                self.process(&mut socket)
+            }
+        } else {
+            panic!("Error occured");
+        }
+    }
+
+    fn process(&self, socket: &mut TcpStream) {
+        // Read request with a fixed-size buffer
+        let mut buffer = [0; 4096];
+        let mut request_data = Vec::new();
+        
+        // Read data until we find the end of headers (\r\n\r\n)
+        let mut bytes_read = 0;
+        let mut headers_end_pos = None;
+        
+        loop {
+            match socket.read(&mut buffer) {
+                Ok(0) => break, // Connection closed by client
+                Ok(n) => {
+                    request_data.extend_from_slice(&buffer[..n]);
+                    bytes_read += n;
+                    
+                    // Look for the end of headers
+                    if let Some(pos) = self.find_headers_end(&request_data) {
+                        headers_end_pos = Some(pos);
+                        break;
+                    }
+                    
+                    // Prevent reading too much data (optional safety measure)
+                    if bytes_read >= 4096 {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error reading from socket: {:?}", e);
+                    return;
+                }
+            }
+        }
+        
+        if let Some(headers_end_pos) = headers_end_pos {
+            // Convert the request data to string
+            if let Ok(request_str) = std::str::from_utf8(&request_data[..headers_end_pos + 4]) {
+                match HttpRequest::parse(request_str) {
+                    Ok(request) => {
+                        let response = self.handle_request(request);
+                        socket.write_all(response.to_string().as_bytes()).unwrap();
+                        socket.flush().unwrap();
+                    }
+                    Err(e) => {
+                        eprintln!("Error parsing request: {:?}", e);
+                    }
+                }
+            } else {
+                eprintln!("Invalid UTF-8 in request");
+            }
+        } else {
+            eprintln!("No complete HTTP request found");
+        }
+    }
+
+    // Helper function to find the end of HTTP headers (\r\n\r\n)
+    fn find_headers_end(&self,data: &[u8]) -> Option<usize> {
+    for i in 0..data.len().saturating_sub(3) {
+        if data[i] == b'\r' && 
+           data[i + 1] == b'\n' && 
+           data[i + 2] == b'\r' && 
+           data[i + 3] == b'\n' {
+            return Some(i);
+        }
+    }
+    None
 }
+}
+
+
+
