@@ -1,2 +1,4 @@
-/target
-/src/bin
+/http/target
+/http/src/bin
+/json/target
+/json/src/bin

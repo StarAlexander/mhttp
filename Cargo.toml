@@ -3,4 +3,12 @@ name = "mhttp"
 version = "0.1.0"
 edition = "2024"
 
+
+
+[lib]
+path = "placeholder.rs"
+
+[workspace]
+members = ["json","http"]
+
 [dependencies]
