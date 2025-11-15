@@ -19,7 +19,7 @@ pub type Handler = Box<dyn Fn(HttpRequest) -> HttpResponse>;
 /// 
 /// let mut app = App::new();
 /// 
-/// app.add_handler("/hello".to_string(), |_| {
+/// app.get("/hello".to_string(), |_| {
 ///     "Hello, World!".to_string().into_response()
 /// });
 /// 
@@ -36,7 +36,7 @@ pub type Handler = Box<dyn Fn(HttpRequest) -> HttpResponse>;
 /// ```
 pub struct App {
     /// A map of URI paths to their corresponding handler functions
-    pub handlers: HashMap<String, Handler>,
+    pub handlers: HashMap<String, HashMap<String,Handler>>,
 }
 
 impl App {
@@ -57,34 +57,170 @@ impl App {
         }
     }
 
-    /// Registers a handler function for a specific URI path.
+    /// Registers a handler function for a `GET` request to a specific path.
     /// 
-    /// When a request with the given URI is received, the provided handler function will be called
-    /// to generate the response.
+    /// When a `GET` request with the given URI is received, the provided handler will be
+    /// called to generate the response.
+    /// 
+    /// If a handler on this route exists, it will be rewritten.
     /// 
     /// # Arguments
     /// 
     /// * `path` - The URI path to register the handler for
-    /// * `handler` - A function that takes an `HttpRequest` and returns an `HttpResponse`
+    /// * `handler` - A function that takes an `HttpRequest` and return an `HttpResponse`
+    /// 
     /// 
     /// # Examples
     /// 
-    /// ```
-    /// use mhttp::{App, HttpRequest, HttpResponse};
     /// 
-    /// let mut app = App::new();
-    /// 
-    /// app.add_handler("/api/users".to_string(), |req| {
-    ///     format!("Received {} request", req.method).into_response()
-    /// });
     /// ```
-    pub fn add_handler<F>(&mut self, path: String, handler: F)
-    where
+    /// use mhttp::{App, Respondable};
+    /// 
+    /// fn main() {
+    ///     let mut app = App::new();
+    ///     
+    ///     app.get(String::from("/"), |req| {
+    ///         "Hello World!".into_response()    
+    ///     })
+    /// }
+    /// ```
+    pub fn get<F>(&mut self, path: String, handler: F)
+    where 
         F: Fn(HttpRequest) -> HttpResponse + 'static,
-    {
-        self.handlers.insert(path, Box::new(handler));
-    }
+         {
+            let get =String::from("GET");
+            let method_map = self.handlers.entry(path).or_insert(HashMap::new());
 
+            // rewrite if exists
+            if method_map.contains_key(&get) {
+                method_map.remove(&get);
+            }
+            method_map.insert(get,Box::new(handler));
+         }
+    
+
+
+    /// Registers a handler function for a `POST` request to a specific path.
+    /// 
+    /// When a `POST` request with the given URI is received, the provided handler will be
+    /// called to generate the response.
+    /// 
+    /// If a handler on this route exists, it will be rewritten.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `path` - The URI path to register the handler for
+    /// * `handler` - A function that takes an `HttpRequest` and return an `HttpResponse`
+    /// 
+    /// 
+    /// # Examples
+    /// 
+    /// 
+    /// ```
+    /// use mhttp::{App, Respondable};
+    /// 
+    /// fn main() {
+    ///     let mut app = App::new();
+    ///     
+    ///     app.post(String::from("/"), |req| {
+    ///         "Hello World!".into_response()    
+    ///     })
+    /// }
+    /// ```
+    pub fn post<F>(&mut self, path: String, handler: F)
+    where 
+        F: Fn(HttpRequest) -> HttpResponse + 'static,
+         {
+            let post =String::from("POST");
+            let method_map = self.handlers.entry(path).or_insert(HashMap::new());
+            if method_map.contains_key(&post) {
+                method_map.remove(&post);
+            }
+            method_map.insert(post,Box::new(handler));
+         }
+    
+
+
+    /// Registers a handler function for a `PUT` request to a specific path.
+    /// 
+    /// When a `PUT` request with the given URI is received, the provided handler will be
+    /// called to generate the response.
+    /// 
+    /// If a handler on this route exists, it will be rewritten.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `path` - The URI path to register the handler for
+    /// * `handler` - A function that takes an `HttpRequest` and return an `HttpResponse`
+    /// 
+    /// 
+    /// # Examples
+    /// 
+    /// 
+    /// ```
+    /// use mhttp::{App, Respondable};
+    /// 
+    /// fn main() {
+    ///     let mut app = App::new();
+    ///     
+    ///     app.put(String::from("/"), |req| {
+    ///         "Hello World!".into_response()    
+    ///     })
+    /// }
+    /// ```
+    pub fn put<F>(&mut self, path: String, handler: F)
+    where 
+        F: Fn(HttpRequest) -> HttpResponse + 'static,
+         {
+            let put =String::from("PUT");
+            let method_map = self.handlers.entry(path).or_insert(HashMap::new());
+            if method_map.contains_key(&put) {
+                method_map.remove(&put);
+            }
+            method_map.insert(put,Box::new(handler));
+         }
+    
+
+
+
+    /// Registers a handler function for a `DELETE` request to a specific path.
+    /// 
+    /// When a `DELETE` request with the given URI is received, the provided handler will be
+    /// called to generate the response.
+    /// 
+    /// If a handler on this route exists, it will be rewritten.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `path` - The URI path to register the handler for
+    /// * `handler` - A function that takes an `HttpRequest` and return an `HttpResponse`
+    /// 
+    /// 
+    /// # Examples
+    /// 
+    /// 
+    /// ```
+    /// use mhttp::{App, Respondable};
+    /// 
+    /// fn main() {
+    ///     let mut app = App::new();
+    ///     
+    ///     app.delete(String::from("/"), |req| {
+    ///         "Hello World!".into_response()    
+    ///     })
+    /// }
+    /// ```
+    pub fn delete<F>(&mut self, path: String, handler: F)
+    where 
+        F: Fn(HttpRequest) -> HttpResponse + 'static,
+         {
+            let delete =String::from("DELETE");
+            let method_map = self.handlers.entry(path).or_insert(HashMap::new());
+            if method_map.contains_key(&delete) {
+                method_map.remove(&delete);
+            }
+            method_map.insert(delete,Box::new(handler));
+         }
     /// Processes an incoming HTTP request and returns the appropriate response.
     /// 
     /// Looks up the request URI in the registered handlers and calls the corresponding handler.
@@ -117,9 +253,13 @@ impl App {
     /// assert_eq!(response.body, "Test response");
     /// ```
     pub fn handle_request(&self, req: HttpRequest) -> HttpResponse {
-        match self.handlers.get(&req.uri.to_string()) {
-            Some(handler) => handler(req),
-            None => HttpResponse::new(StatusCode::NotFound, "Not Found".to_string()),
+        if let Some(method_map) = self.handlers.get(&req.uri.to_string()) {
+            match method_map.get(req.method) {
+                Some(handler) => handler(req),
+                None => HttpResponse::new(StatusCode::NotFound, "Not Found".to_string()),
+            }
+        } else {
+            HttpResponse::new(StatusCode::NotFound,"Not Found".to_string())
         }
     }
 
@@ -143,7 +283,7 @@ impl App {
     ///     
     ///     let mut app = App::new();
     ///     
-    ///     app.add_handler("/".to_string(), |_| => {
+    ///     app.get("/".to_string(), |_| => {
     ///         "hello world".into_response()
     ///     });
     /// 
@@ -164,62 +304,102 @@ impl App {
     }
 
     fn process(&self, socket: &mut TcpStream) {
-        // Read request with a fixed-size buffer
-        let mut buffer = [0; 4096];
-        let mut request_data = Vec::new();
-        
-        // Read data until we find the end of headers (\r\n\r\n)
-        let mut bytes_read = 0;
-        let mut headers_end_pos = None;
-        
-        loop {
-            match socket.read(&mut buffer) {
-                Ok(0) => break, // Connection closed by client
-                Ok(n) => {
-                    request_data.extend_from_slice(&buffer[..n]);
-                    bytes_read += n;
-                    
-                    // Look for the end of headers
-                    if let Some(pos) = self.find_headers_end(&request_data) {
-                        headers_end_pos = Some(pos);
-                        break;
-                    }
-                    
-                    // Prevent reading too much data (optional safety measure)
-                    if bytes_read >= 4096 {
-                        break;
-                    }
+    let mut buffer = [0; 4096];
+    let mut request_data = Vec::new();
+    let max_request_size = 8192; // Increased for body support
+    let mut total_bytes_read = 0;
+
+    // Read headers first
+    let headers_end = loop {
+        match socket.read(&mut buffer) {
+            Ok(0) => {
+                // Connection closed by client
+                return;
+            }
+            Ok(n) => {
+                request_data.extend_from_slice(&buffer[..n]);
+                total_bytes_read += n;
+
+                // Look for the end of headers (\r\n\r\n)
+                if let Some(pos) = Self::find_headers_end(&request_data) {
+                    break pos + 4; // +4 to include \r\n\r\n
                 }
-                Err(e) => {
-                    eprintln!("Error reading from socket: {:?}", e);
+
+                // Safety: prevent reading too much data
+                if total_bytes_read >= max_request_size {
+                    eprintln!("Request too large, stopping read");
                     return;
                 }
             }
+            Err(e) => {
+                eprintln!("Error reading from socket: {:?}", e);
+                return;
+            }
         }
-        
-        if let Some(headers_end_pos) = headers_end_pos {
-            // Convert the request data to string
-            if let Ok(request_str) = std::str::from_utf8(&request_data[..headers_end_pos + 4]) {
-                match HttpRequest::parse(request_str) {
-                    Ok(request) => {
-                        let response = self.handle_request(request);
-                        socket.write_all(response.to_string().as_bytes()).unwrap();
-                        socket.flush().unwrap();
+    };
+
+    // Parse headers
+    if let Ok(headers_str) = std::str::from_utf8(&request_data[..headers_end]) {
+        match HttpRequest::parse(headers_str) {
+            Ok(mut request) => {
+                // Parse Content-Length from headers to know how much body to read
+                let content_length = Self::get_content_length(headers_str);
+                
+                // Read the body if there is one
+                if content_length > 0 {
+                    let mut body = Vec::new();
+                    let remaining_bytes = request_data.len() - headers_end;
+                    
+                    // Add any body data already read
+                    if remaining_bytes > 0 {
+                        body.extend_from_slice(&request_data[headers_end..]);
                     }
-                    Err(e) => {
-                        eprintln!("Error parsing request: {:?}", e);
+
+                    // Read the rest of the body
+                    let mut bytes_to_read = content_length.saturating_sub(remaining_bytes);
+                    while bytes_to_read > 0 {
+                        match socket.read(&mut buffer) {
+                            Ok(0) => {
+                                // Connection closed before reading full body
+                                eprintln!("Connection closed before reading full body");
+                                break;
+                            }
+                            Ok(n) => {
+                                let to_copy = std::cmp::min(n, bytes_to_read);
+                                body.extend_from_slice(&buffer[..to_copy]);
+                                bytes_to_read -= to_copy;
+                            }
+                            Err(e) => {
+                                eprintln!("Error reading body from socket: {:?}", e);
+                                return;
+                            }
+                        }
+                    }
+                    
+                    // Convert body to string
+                    if let Ok(body_str) = std::str::from_utf8(&body) {
+                        request.body = body_str.to_string();
+                    } else {
+                        eprintln!("Invalid UTF-8 in request body");
                     }
                 }
-            } else {
-                eprintln!("Invalid UTF-8 in request");
-            }
-        } else {
-            eprintln!("No complete HTTP request found");
-        }
-    }
 
-    // Helper function to find the end of HTTP headers (\r\n\r\n)
-    fn find_headers_end(&self,data: &[u8]) -> Option<usize> {
+                // Handle the request with body
+                let response = self.handle_request(request);
+                socket.write_all(response.to_string().as_bytes()).unwrap();
+                socket.flush().unwrap();
+            }
+            Err(e) => {
+                eprintln!("Error parsing request: {:?}", e);
+            }
+        }
+    } else {
+        eprintln!("Invalid UTF-8 in request headers");
+    }
+}
+
+// Helper function to find the end of HTTP headers
+fn find_headers_end(data: &[u8]) -> Option<usize> {
     for i in 0..data.len().saturating_sub(3) {
         if data[i] == b'\r' && 
            data[i + 1] == b'\n' && 
@@ -230,6 +410,17 @@ impl App {
     }
     None
 }
+
+// Helper function to extract Content-Length from headers
+fn get_content_length(headers: &str) -> usize {
+    for line in headers.lines() {
+        if line.to_lowercase().starts_with("content-length:") {
+            return line[15..].trim().parse().unwrap_or(0);
+        }
+    }
+    0
+}
+
 }
 
 

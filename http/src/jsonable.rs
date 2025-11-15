@@ -41,7 +41,6 @@ pub enum Token {
     Number(f64),
     Boolean(bool),
     Null,
-    Eof,
 }
 
 pub trait FromJsonValue: Sized {
@@ -175,7 +174,6 @@ fn tokenize(input: &str) -> Result<Vec<Token>,String> {
             }
         }
     }
-    tokens.push(Token::Eof);
     Ok(tokens)
 }
 
@@ -187,77 +185,140 @@ pub struct Parser {
 }
 
 impl Parser {
-    pub fn new(tokens:Vec<Token>) -> Self {
-        Parser {tokens, position: 0}
+    pub fn new(tokens: Vec<Token>) -> Self {
+        Parser { tokens, position: 0 }
     }
 
-    pub fn peek(&self) -> &Token {
-        &self.tokens[self.position]
+    pub fn peek(&self) -> Result<&Token, String> {
+        if self.position >= self.tokens.len() {
+            Err("Unexpected end of input".to_string())
+        } else {
+            Ok(&self.tokens[self.position])
+        }
     }
 
-    pub fn consume(&mut self) -> Token {
-        self.position += 1;
-        self.tokens[self.position - 1].clone()
+    pub fn consume(&mut self) -> Result<Token, String> {
+        if self.position >= self.tokens.len() {
+            Err("Unexpected end of input".to_string())
+        } else {
+            let token = self.tokens[self.position].clone();
+            self.position += 1;
+            Ok(token)
+        }
     }
 
-    pub fn parse_value(&mut self) -> Result<JsonValue,String> {
-        match self.peek() {
-            Token::Null => {self.consume(); Ok(JsonValue::Null)},
-            Token::Boolean(b) => {let val = *b; self.consume(); Ok(JsonValue::Boolean(val))},
-            Token::Number(n) => {let val = *n; self.consume(); Ok(JsonValue::Number(val))},
-            Token::String(s) => {let val = s.clone(); self.consume(); Ok(JsonValue::String(val))},
+    pub fn parse_value(&mut self) -> Result<JsonValue, String> {
+        let token = self.peek()?;
+        match token {
+            Token::Null => {
+                self.consume()?;
+                Ok(JsonValue::Null)
+            },
+            Token::Boolean(b) => {
+                let val = *b;
+                self.consume()?;
+                Ok(JsonValue::Boolean(val))
+            },
+            Token::Number(n) => {
+                let val = *n;
+                self.consume()?;
+                Ok(JsonValue::Number(val))
+            },
+            Token::String(s) => {
+                let val = s.clone();
+                self.consume()?;
+                Ok(JsonValue::String(val))
+            },
             Token::BracketOpen => self.parse_array(),
             Token::CurlyOpen => self.parse_object(),
-            _ => Err(format!("Unexpected token: {:?}",self.peek())),
+            _ => Err(format!("Unexpected token: {:?}", token)),
         }
     }
 
-    pub fn parse_array(&mut self) -> Result<JsonValue,String> {
-        self.consume();
+    pub fn parse_array(&mut self) -> Result<JsonValue, String> {
+        self.consume()?; // Consume '['
         let mut elements = vec![];
 
-        while self.peek() != &Token::BracketClose {
+        // Check if array is empty
+        if self.peek()? == &Token::BracketClose {
+            self.consume()?; // Consume ']'
+            return Ok(JsonValue::Array(elements));
+        }
+
+        loop {
             elements.push(self.parse_value()?);
-            if self.peek() == &Token::Comma {
-                self.consume();
-            } else if self.peek() != &Token::BracketClose {
-                return Err("Expected comman or closing bracket in array.".to_string());
+            
+            let next_token = self.peek()?;
+            if next_token == &Token::Comma {
+                self.consume()?; // Consume ','
+            } else if next_token == &Token::BracketClose {
+                break;
+            } else {
+                return Err(format!("Expected comma or closing bracket, got: {:?}", next_token));
             }
         }
-        self.consume(); // Consume ']'
+        
+        self.consume()?; // Consume ']'
         Ok(JsonValue::Array(elements))
     }
 
-    pub fn parse_object(&mut self) -> Result<JsonValue,String> {
-        self.consume(); // Consume '{'
+    pub fn parse_object(&mut self) -> Result<JsonValue, String> {
+        self.consume()?; // Consume '{'
 
         let mut members = vec![];
 
-        while self.peek() != &Token::CurlyClose {
-            let key_token = self.consume();
-            let key = if let Token::String(s) = key_token {s} else {return Err("Expected string key in object.".to_string())};
-            if self.peek() != &Token::Colon {return Err("Expected colon after key.".to_string())}
-            self.consume();
-            let value = self.parse_value()?;
-            members.push((key,value));
+        // Check if object is empty
+        if self.peek()? == &Token::CurlyClose {
+            self.consume()?; // Consume '}'
+            return Ok(JsonValue::Object(members));
+        }
 
-            if self.peek() == &Token::Comma {
-                self.consume();
-            } else if self.peek() != &Token::CurlyClose {
-                return Err("Expected comma or closing curly brace in object.".to_string());
+        loop {
+            let key_token = self.consume()?;
+            let key = if let Token::String(s) = key_token {
+                s
+            } else {
+                return Err("Expected string key in object.".to_string());
+            };
+            
+            if self.peek()? != &Token::Colon {
+                return Err("Expected colon after key.".to_string());
+            }
+            self.consume()?; // Consume ':'
+            
+            let value = self.parse_value()?;
+            members.push((key, value));
+
+            let next_token = self.peek()?;
+            if next_token == &Token::Comma {
+                self.consume()?; // Consume ','
+            } else if next_token == &Token::CurlyClose {
+                break;
+            } else {
+                return Err(format!("Expected comma or closing curly brace, got: {:?}", next_token));
             }
         }
-        self.consume(); // Consume '}'
+        
+        self.consume()?; // Consume '}'
         Ok(JsonValue::Object(members))
     }
 
-    pub fn parse_json(input: &str) -> Result<JsonValue,String> {
+    pub fn parse_json(input: &str) -> Result<JsonValue, String> {
         let tokens = tokenize(input)?;
+        
+        if tokens.is_empty() {
+            return Err("Empty input".to_string());
+        }
 
         let mut parser = Parser::new(tokens);
-        parser.parse_value()
+        let result = parser.parse_value()?;
+        
+        // Check if there are remaining tokens (should be at end)
+        if parser.position < parser.tokens.len() {
+            return Err(format!("Unexpected tokens after JSON value: {:?}", 
+                             &parser.tokens[parser.position..]));
+        }
+        
+        Ok(result)
     }
-
-
 }
-

@@ -25,7 +25,7 @@ pub use jsonable::{Jsonable,Parser};
 
 pub use json::Jsonable;
 pub use app::App;
-pub use server::{Respondable,HttpRequest,HttpResponse};
+pub use server::{Respondable,HttpRequest,HttpResponse,StatusCode};
 
 #[cfg(test)]
 mod tests {
@@ -39,7 +39,7 @@ mod tests {
     fn test_app() {
         let mut app = crate::app::App::new();
 
-        app.add_handler("/".to_string(),|_| {
+        app.get("/".to_string(),|_| {
             "Hello world".into_response()
         });
 

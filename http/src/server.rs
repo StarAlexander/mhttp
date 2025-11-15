@@ -359,3 +359,12 @@ where
         }
     }
 }
+
+
+/// For convenience, `Unit` type also implements Respondable.
+/// This allows no return in a handler.
+impl Respondable for () {
+    fn into_response(self) -> HttpResponse {
+        HttpResponse::new(StatusCode::Ok,"".to_string())
+    }
+}
