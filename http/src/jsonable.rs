@@ -9,7 +9,8 @@ pub trait Jsonable {
 
 
     /// Converts a valid json string into the given type.
-    fn from_json(json_string: &str) -> Self;
+    fn from_json(json_string: &str) -> Result<Self, Box<dyn std::error::Error>>
+    where Self:Sized;
 }
 
 
