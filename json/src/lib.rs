@@ -1,9 +1,9 @@
+
+
 use proc_macro::TokenStream;
 use syn::{Data, DeriveInput, Fields, FieldsNamed, parse_macro_input};
 use quote::quote;
 extern crate proc_macro;
-
-
 
 
 
@@ -30,10 +30,11 @@ pub fn derive_jsonable(input: TokenStream) -> TokenStream {
     };
 
     let field_names = named_fields.iter().map(|field| &field.ident);
-    let _field_types = named_fields.iter().map(|field| &field.ty);
+    let field_types = named_fields.iter().map(|field| &field.ty);
 
 
     let generated = quote! {
+        use http::jsonable::{Parser,JsonValue,FromJsonValue};
         impl Jsonable for #name {
 
             fn into_json(&self) -> String {
@@ -41,9 +42,22 @@ pub fn derive_jsonable(input: TokenStream) -> TokenStream {
             }
 
             fn from_json(json_string:&str) -> #name {
+                let parsed = Parser::parse_json(json_string).expect("Failed to parse JSON string.");
+
+                let members = if let JsonValue::Object(members) = parsed {
+                    members
+                } else {
+                    panic!("Expected a JSON object for struct {}",stringify!(#name));
+                };
+                let get_field_val = |key: &str| {
+                    members.iter().find(|(k, _)| k == key)
+                        .map(|(_, v)| v)
+                        .unwrap_or_else(|| panic!("Missing required field '{}'", key))
+                };
                 return #name {
                     #(
-                        #field_names: "Unimplemented.".to_string(),
+                        #field_names: #field_types::from_json_value(get_field_val(stringify!(#field_names)))
+                        .expect(&format!("Failed to convert value for field '{}'",stringify!(#field_names))),
                     )*
                 }
             }
