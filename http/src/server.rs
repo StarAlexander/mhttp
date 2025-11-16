@@ -8,10 +8,10 @@ use std::collections::HashMap;
 /// URI, headers, and body. It's passed to handler functions for processing.
 /// 
 #[derive(Debug, Clone)]
-pub struct HttpRequest<'a> {
-    pub method: &'a str,
-    pub uri: &'a str,
-    pub version: &'a str,
+pub struct HttpRequest {
+    pub method:  String,
+    pub uri: String,
+    pub version: String,
     pub headers: HashMap<String, String>,
     pub content_length: usize,
     pub body: String,
@@ -42,14 +42,14 @@ impl std::fmt::Display for ParseError {
 
 impl std::error::Error for ParseError {}
 
-impl<'a> HttpRequest<'a> {
+impl HttpRequest {
     /// Parses an HTTP request from a string slice.
     /// Assumes request is in the format:
     /// METHOD URI VERSION\r\n
     /// Header: Value\r\n
     /// \r\n
     /// [body]
-    pub fn parse(input: &'a str) -> Result<Self, ParseError> {
+    pub fn parse(input: &str) -> Result<Self, ParseError> {
         let mut lines = input.lines();
 
         // Parse request line (first line)
@@ -87,36 +87,36 @@ impl<'a> HttpRequest<'a> {
         })
     }
 
-    fn parse_request_line(line: &str) -> Result<(&str, &str, &str), ParseError> {
+    fn parse_request_line(line: &str) -> Result<(String, String, String), ParseError> {
         let mut parts = line.split(SP);
-        let method = parts.next().ok_or(ParseError::MalformedRequest)?;
-        let uri = parts.next().ok_or(ParseError::MalformedRequest)?;
+        let method = parts.next().ok_or(ParseError::MalformedRequest)?.to_string();
+        let uri = parts.next().ok_or(ParseError::MalformedRequest)?.to_string();
         let version_with_crlf = parts.next().ok_or(ParseError::MalformedRequest)?;
 
         // Remove \r\n if present
-        let version = version_with_crlf.trim_end_matches(|c| c == CR || c == LF);
+        let version = version_with_crlf.trim_end_matches(|c| c == CR || c == LF).to_string();
 
         // Validate method
-        match method {
+        match method.as_str() {
             "GET" | "POST" | "PUT" | "DELETE" | "OPTIONS" | "HEAD" | "PATCH" => (),
             _ => return Err(ParseError::InvalidMethod(method.to_string())),
         }
 
         // Validate version
-        match version {
+        match version.as_str() {
             "HTTP/1.0" | "HTTP/1.1" => (),
             _ => return Err(ParseError::InvalidVersion(version.to_string())),
         }
 
         // Basic URI validation (no regex)
-        if !Self::is_valid_uri(uri) {
-            return Err(ParseError::InvalidUri(uri.to_string()));
+        if !Self::is_valid_uri(&uri) {
+            return Err(ParseError::InvalidUri(uri));
         }
 
         Ok((method, uri, version))
     }
 
-    fn is_valid_uri(uri: &str) -> bool {
+    fn is_valid_uri(uri: &String) -> bool {
         // Basic checks: starts with /, no control chars, etc.
         if !uri.starts_with('/') {
             return false;

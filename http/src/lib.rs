@@ -24,7 +24,7 @@ pub use jsonable::{Jsonable,Parser};
 
 
 pub use json::Jsonable;
-pub use app::App;
+pub use app::{App,MiddlewareResult,Middleware,Handler};
 pub use server::{Respondable,HttpRequest,HttpResponse,StatusCode};
 
 #[cfg(test)]
@@ -44,9 +44,9 @@ mod tests {
         });
 
         let req = HttpRequest {
-            method:"GET",
-            uri: "/",
-            version: "HTTP/1.1",
+            method:String::from("GET"),
+            uri: String::from("/"),
+            version: String::from("HTTP/1.1"),
             headers:HashMap::new(),
             body:String::new(),
             content_length:0,

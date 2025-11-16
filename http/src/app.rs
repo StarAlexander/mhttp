@@ -6,7 +6,21 @@ use std::{collections::HashMap, io::{Read, Write}, net::{TcpListener, TcpStream}
 /// These functions are stored in the `App` router for specific paths.
 pub type Handler = Box<dyn Fn(HttpRequest) -> HttpResponse>;
 
-pub type Middleware = Box<dyn Fn(&HttpRequest) -> ()>;
+
+
+/// This enum allows to effectively return from the middleware chain with a response.
+/// 
+/// 
+/// `Response` - use this when you do not want to go through the next middlewares.
+/// `Continue` - use this when you want to continue the middleware chain.
+#[derive(Debug)]
+pub enum MiddlewareResult {
+    Response(HttpResponse),
+    Continue(HttpRequest)
+}
+
+
+pub type Middleware = Box<dyn Fn(HttpRequest) -> MiddlewareResult + 'static>;
 
 /// The main application struct that handles HTTP routing and request processing.
 /// 
@@ -313,7 +327,7 @@ impl App {
     /// 
     /// 
     pub fn use_middleware<F>(&mut self, md: F)
-    where F: Fn(&HttpRequest) -> () + 'static {
+    where F: Fn(HttpRequest) -> MiddlewareResult + 'static {
         self.middlewares.push(Box::new(md));
     }
 
@@ -350,13 +364,18 @@ impl App {
     /// assert_eq!(response.body, "Test response");
     /// ```
     pub fn handle_request(&self, req: HttpRequest) -> HttpResponse {
-        for md in self.middlewares.iter() {
-            md(&req);
+        let mut current_request = req;
+
+        for md in &self.middlewares {
+            match md(current_request) {
+                MiddlewareResult::Response(response) => return response,
+                MiddlewareResult::Continue(req) => current_request = req,
+            }
         }
 
-            if let Some(method_map) = self.handlers.get(&req.uri.to_string()) {
-            match method_map.get(req.method) {
-                Some(handler) => handler(req),
+            if let Some(method_map) = self.handlers.get(&current_request.uri.to_string()) {
+            match method_map.get(&current_request.method) {
+                Some(handler) => handler(current_request),
                 None => HttpResponse::new(StatusCode::NotFound, "Not Found".to_string()),
             }
             } else {
