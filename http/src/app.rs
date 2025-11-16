@@ -1,11 +1,12 @@
 use crate::server::{HttpRequest,HttpResponse,StatusCode};
-use std::{collections::HashMap, io::Write, net::{TcpListener,TcpStream}};
-use std::io::Read;
+use std::{collections::HashMap, io::{Read, Write}, net::{TcpListener, TcpStream}};
 /// Type alias for a function that handles HTTP requests and returns responses.
 /// 
 /// Handlers take an `HttpRequest` and return an `HttpResponse`.
 /// These functions are stored in the `App` router for specific paths.
 pub type Handler = Box<dyn Fn(HttpRequest) -> HttpResponse>;
+
+pub type Middleware = Box<dyn Fn(&HttpRequest) -> ()>;
 
 /// The main application struct that handles HTTP routing and request processing.
 /// 
@@ -23,20 +24,11 @@ pub type Handler = Box<dyn Fn(HttpRequest) -> HttpResponse>;
 ///     "Hello, World!".to_string().into_response()
 /// });
 /// 
-/// let req = HttpRequest {
-///     method: "GET".to_string(),
-///     uri: "/hello".to_string(),
-///     version: "HTTP/1.1".to_string(),
-///     headers: std::collections::HashMap::new(),
-///     body: String::new(),
-/// };
-/// 
-/// let response = app.handle_request(req);
-/// assert_eq!(response.status, StatusCode::Ok);
+/// app.listen(3000);
 /// ```
 pub struct App {
-    /// A map of URI paths to their corresponding handler functions
     pub handlers: HashMap<String, HashMap<String,Handler>>,
+    pub middlewares: Vec<Middleware>,
 }
 
 impl App {
@@ -54,6 +46,7 @@ impl App {
     pub fn new() -> Self {
         Self {
             handlers: HashMap::new(),
+            middlewares: Vec::new(),
         }
     }
 
@@ -287,6 +280,44 @@ impl App {
         panic!("Error happened.");
     }
 }
+
+    /// Adds a middleware function 
+    /// 
+    /// Multiple middlewares are executed in a sequential order, corresponding
+    /// to the order in which they were defined in your code, that is:
+    /// 
+    /// ```
+    /// app.use_middleware(|_| {
+    /// 
+    ///     println!("First!");
+    ///     
+    /// });
+    /// 
+    /// app.use_middleware(|_| {
+    ///     
+    ///     println!("Second!");
+    /// })
+    /// ```
+    /// 
+    /// The result will be:
+    /// 
+    /// ```
+    /// "First!"
+    /// "Second!"
+    /// ```
+    /// 
+    /// 
+    /// # Arguments
+    /// 
+    /// * `md` - a middleware to be added.
+    /// 
+    /// 
+    pub fn use_middleware<F>(&mut self, md: F)
+    where F: Fn(&HttpRequest) -> () + 'static {
+        self.middlewares.push(Box::new(md));
+    }
+
+
     /// Processes an incoming HTTP request and returns the appropriate response.
     /// 
     /// Looks up the request URI in the registered handlers and calls the corresponding handler.
@@ -303,7 +334,7 @@ impl App {
     /// 
     /// let mut app = App::new();
     /// 
-    /// app.add_handler("/test".to_string(), |_| {
+    /// app.get("/test".to_string(), |_| {
     ///     "Test response".to_string().into_response()
     /// });
     /// 
@@ -319,14 +350,19 @@ impl App {
     /// assert_eq!(response.body, "Test response");
     /// ```
     pub fn handle_request(&self, req: HttpRequest) -> HttpResponse {
-        if let Some(method_map) = self.handlers.get(&req.uri.to_string()) {
+        for md in self.middlewares.iter() {
+            md(&req);
+        }
+
+            if let Some(method_map) = self.handlers.get(&req.uri.to_string()) {
             match method_map.get(req.method) {
                 Some(handler) => handler(req),
                 None => HttpResponse::new(StatusCode::NotFound, "Not Found".to_string()),
             }
-        } else {
-            HttpResponse::new(StatusCode::NotFound,"Not Found".to_string())
-        }
+            } else {
+                HttpResponse::new(StatusCode::NotFound,"Not Found".to_string())
+                }
+        
     }
 
     /// Starts a server on a specified port
@@ -488,6 +524,5 @@ fn get_content_length(headers: &str) -> usize {
 }
 
 }
-
 
 
