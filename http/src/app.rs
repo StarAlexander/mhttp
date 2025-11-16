@@ -221,6 +221,72 @@ impl App {
             }
             method_map.insert(delete,Box::new(handler));
          }
+    
+
+    
+    /// Serving static files in a specified directory.
+    /// 
+    /// 
+    /// # Arguments
+    /// 
+    /// * `dir_path` - a path to the directory containing files to be served.
+    /// 
+    /// 
+    /// * `serving_path` - a prefix path to the files of the directory.
+    /// Pass "" to default to "/".
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use mhttp::{App};
+    /// 
+    /// 
+    /// fn main() {
+    /// 
+    ///     let mut app = App::new();
+    /// 
+    ///     app.serve_static_dir(String::from("/static"),String::from("")); // Assuming there is a "/static" directory at the root of the project.
+    /// 
+    /// 
+    ///     app.listen(3000);
+    /// }
+    /// ```
+    pub fn serve_static_dir(&mut self, dir_path: String, serving_path: String) {
+    if let Ok(dir) = std::fs::read_dir(&dir_path) {
+        for file_entry in dir {
+            let file_entry = match file_entry {
+                Ok(entry) => entry,
+                Err(e) => {
+                    eprintln!("Error reading directory entry: {}", e);
+                    continue;
+                }
+            };
+            
+            let file_name = file_entry.file_name();
+            let file_path = file_entry.path();
+
+
+            if file_path.is_file() {
+                let file_content = match std::fs::read_to_string(&file_path) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        eprintln!("Error reading file {:?}: {}", file_path, e);
+                        continue;
+                    }
+                };
+                let route_path = format!("{}/{}", serving_path,file_name.to_string_lossy());
+                self.get(route_path, move |_| {
+                    let cloned_content = file_content.clone();
+                    HttpResponse::new(StatusCode::Ok, String::from(cloned_content)) 
+                });
+            } else {
+                self.serve_static_dir(file_path.to_string_lossy().to_string(), format!("{}/{}",serving_path,file_name.to_string_lossy()));
+            }
+        }
+    } else {
+        panic!("Error happened.");
+    }
+}
     /// Processes an incoming HTTP request and returns the appropriate response.
     /// 
     /// Looks up the request URI in the registered handlers and calls the corresponding handler.
