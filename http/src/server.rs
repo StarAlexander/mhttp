@@ -15,6 +15,7 @@ pub struct HttpRequest {
     pub headers: HashMap<String, String>,
     pub content_length: usize,
     pub body: String,
+    pub path_params: HashMap<String,String>
 }
 
 const SP: char = ' ';
@@ -84,6 +85,7 @@ impl HttpRequest {
             headers,
             content_length,
             body,
+            path_params:HashMap::new()
         })
     }
 

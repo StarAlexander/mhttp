@@ -42,6 +42,7 @@ pub type Middleware = Box<dyn Fn(HttpRequest) -> MiddlewareResult + 'static>;
 /// ```
 pub struct App {
     pub handlers: HashMap<String, HashMap<String,Handler>>,
+    pub param_handlers: Vec<(String,String,Handler)>,
     pub middlewares: Vec<Middleware>,
 }
 
@@ -60,6 +61,7 @@ impl App {
     pub fn new() -> Self {
         Self {
             handlers: HashMap::new(),
+            param_handlers:Vec::new(),
             middlewares: Vec::new(),
         }
     }
@@ -105,7 +107,22 @@ impl App {
             method_map.insert(get,Box::new(handler));
          }
     
+    
 
+    /// Adds a handler with path parameters
+    /// 
+    /// # Arguments
+    /// 
+    /// * `path` - a path pattern with parameters wrapped in curly braces
+    /// * `method` - HTTP method
+    /// * `handler` - a specified handler
+    /// 
+    /// 
+    pub fn add_param_handler<F>(&mut self, path:String,method: String, handler: F)
+    where
+         F: Fn(HttpRequest) -> HttpResponse + 'static {
+            self.param_handlers.push((path,method,Box::new(handler)));
+         }
 
     /// Registers a handler function for a `POST` request to a specific path.
     /// 
@@ -374,14 +391,46 @@ impl App {
         }
 
             if let Some(method_map) = self.handlers.get(&current_request.uri.to_string()) {
-            match method_map.get(&current_request.method) {
-                Some(handler) => handler(current_request),
-                None => HttpResponse::new(StatusCode::NotFound, "Not Found".to_string()),
+            if let Some(handler) = method_map.get(&current_request.method) {
+                return  handler(current_request);
             }
-            } else {
-                HttpResponse::new(StatusCode::NotFound,"Not Found".to_string())
+            }
+
+            for (pattern, method,handler) in &self.param_handlers {
+                if method == &current_request.method {
+                    if let Some(path_params) = Self::match_route_pattern(pattern,&current_request.uri) {
+                        current_request.path_params = path_params;
+                        return handler(current_request);
+                    }
                 }
+            }
+
+            HttpResponse::new(StatusCode::NotFound,"Not Found".to_string())
         
+    }
+
+
+    fn match_route_pattern(pattern:&str,uri:&str) -> Option<HashMap<String,String>> {
+        let pattern_parts: Vec<&str> = pattern.split('/').collect();
+        let uri_parts: Vec<&str> = uri.split('/').collect();
+
+
+        if pattern_parts.len() != uri_parts.len() {
+            return None;
+        }
+
+        let mut params = HashMap::new();
+
+        for (pattern_part,uri_part) in pattern_parts.iter().zip(uri_parts.iter()) {
+            if pattern_part.starts_with('{') && pattern_part.ends_with('}') {
+
+                let param_name = &pattern_part[1..pattern_part.len()-1];
+                params.insert(param_name.to_string(),uri_part.to_string());
+            }else if pattern_part != uri_part {
+                return None;
+            }
+        }
+        Some(params)
     }
 
     /// Starts a server on a specified port

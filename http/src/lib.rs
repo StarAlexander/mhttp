@@ -50,6 +50,7 @@ mod tests {
             headers:HashMap::new(),
             body:String::new(),
             content_length:0,
+            path_params:HashMap::new()
         };
 
         let response = app.handle_request(req);
